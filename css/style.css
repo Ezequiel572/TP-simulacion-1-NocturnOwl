@@ -1,0 +1,71 @@
+/* ===== Base ===== */
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d12; color: #e6e8ee;
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+canvas#c { position: fixed; inset: 0; display: block; touch-action: none; }
+
+/* ===== Panel izquierdo (con pestañas) ===== */
+#panel { position: fixed; top: 12px; left: 12px; width: 270px; max-height: calc(100vh - 90px); overflow-y: auto;
+  padding: 12px; background: rgba(18,21,28,.92); border: 1px solid #2a3040; border-radius: 12px;
+  backdrop-filter: blur(6px); box-shadow: 0 6px 24px rgba(0,0,0,.35); }
+#panel h1 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+.tabs { display: flex; gap: 4px; margin-bottom: 10px; padding: 3px; background: #0e1118; border-radius: 9px; }
+.tab { flex: 1; padding: 6px 4px; font-size: 12px; background: transparent; border: 0; border-radius: 7px; color: #9aa3b5; cursor: pointer; }
+.tab:hover { color: #fff; }
+.tab.on { background: #ffb347; color: #1a1306; font-weight: 600; }
+.hint { margin: 0 0 8px; color: #aab2c3; font-size: 12px; }
+.hint b { color: #e6e8ee; }
+label { display: block; margin: 8px 0 3px; color: #c3c9d6; }
+label b { float: right; color: #ffb347; font-weight: 600; }
+label.check { display: flex; align-items: center; gap: 7px; cursor: pointer; margin: 7px 0; }
+input[type=range] { width: 100%; accent-color: #ffb347; }
+input[type=color] { width: 100%; height: 30px; padding: 0; border: 1px solid #2a3040; border-radius: 6px; background: none; }
+input[type=number] { width: 100%; padding: 6px 8px; color: #e6e8ee; background: #0e1118; border: 1px solid #2a3040; border-radius: 6px; }
+input:disabled { opacity: .4; }
+.row { margin-top: 12px; }
+
+/* ===== Botones ===== */
+button { font: inherit; color: #e6e8ee; background: #232938; border: 1px solid #333b50; border-radius: 8px; padding: 6px 11px; cursor: pointer; }
+button:hover { background: #2d3548; }
+button.on { background: #ffb347; border-color: #ffb347; color: #1a1306; font-weight: 600; }
+.row button { width: 100%; }
+
+/* ===== HUD (arriba a la derecha) ===== */
+#hud { position: fixed; top: 12px; right: 12px; min-width: 200px; padding: 10px 12px; background: rgba(18,21,28,.92);
+  border: 1px solid #2a3040; border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
+#hud span { color: #9aa3b5; }
+#hud b { float: right; margin-left: 10px; }
+#hud .state { margin-bottom: 6px; font-weight: 700; color: #2fbf9a; }
+#hud.lit { border-color: #e5262a; }
+#hud.lit .state { color: #ff5a5a; }
+
+/* ===== Barra inferior: siempre visible, aquí está el editor ===== */
+#toolbar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
+  max-width: calc(100vw - 24px); padding: 8px 10px; background: rgba(18,21,28,.94); border: 1px solid #2a3040; border-radius: 14px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.4); }
+#tools { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+#tools .check { margin: 0 4px; white-space: nowrap; }
+.sep { width: 1px; height: 22px; background: #333b50; margin: 0 4px; }
+#btnModo { background: #ffb347; border-color: #ffb347; color: #1a1306; font-weight: 700; padding: 8px 16px; white-space: nowrap; }
+#btnModo:hover { background: #ffc46e; }
+
+/* ===== Botón de info (abajo a la izquierda) ===== */
+#btnInfo { position: fixed; left: 12px; bottom: 14px; font-size: 12px; opacity: .8; }
+#btnInfo:hover { opacity: 1; }
+
+/* ===== Aviso temporal ===== */
+#toast { position: fixed; left: 50%; bottom: 84px; transform: translate(-50%, 10px); padding: 8px 14px; background: #ffb347; color: #1a1306;
+  font-weight: 600; border-radius: 9px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ===== Pantallas pequeñas ===== */
+@media (max-width: 900px) {
+  #panel { width: 230px; }
+  #hud { min-width: 170px; }
+}
+
+/* ===== Herramientas de luz: una raya del color de cada luz ===== */
+button[data-tool="luz_azul"]     { border-bottom: 3px solid #3d8bff; }
+button[data-tool="luz_roja"]     { border-bottom: 3px solid #ff2b2b; }
+button[data-tool="luz_amarilla"] { border-bottom: 3px solid #ffd028; }

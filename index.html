@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulación de luz 2D</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+/* Añadidos de esta versión (los dejo aquí para no tocar css/style.css) */
+.tab { padding: 6px 2px; font-size: 11.5px; }
+button[data-tool="boton_azul"] { border-bottom: 3px solid #2f7bff; }
+button[data-tool="boton_roja"] { border-bottom: 3px solid #e5262a; }
+button[data-tool="puerta"]     { border-bottom: 3px solid #7dffb0; }
+#botonLink { width: 100%; padding: 6px 8px; color: #e6e8ee; background: #0e1118; border: 1px solid #2a3040; border-radius: 6px; font: inherit; }
+#victoria { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(8,10,15,.85); }
+#victoria .caja { min-width: 300px; padding: 28px 34px; text-align: center; background: #151922; border: 1px solid #2a3040; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+#victoria h2 { margin: 0 0 12px; font-size: 28px; color: #7dffb0; }
+#victoria p { margin: 6px 0; color: #c3c9d6; font-size: 14px; }
+#victoria b { color: #ffb347; }
+#victoria button { margin-top: 16px; padding: 10px 22px; font-size: 14px; font-weight: 700; background: #ffb347; border-color: #ffb347; color: #1a1306; }
+</style>
+<script>
+addEventListener('error', e => {
+  const t = e.target;
+  const msg = t && t.getAttribute && (t.getAttribute('src') || t.getAttribute('href'))
+    ? 'No se pudo cargar "' + (t.getAttribute('src') || t.getAttribute('href')) + '". Revisa que las carpetas js/, css/ y assets/ estén junto a index.html.'
+    : 'Error de JavaScript: ' + e.message + ' (' + String(e.filename).split('/').pop() + ':' + e.lineno + ')';
+  let b = document.getElementById('err');
+  if (!b) {
+    b = document.createElement('div'); b.id = 'err';
+    b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99;background:#7a1b1b;color:#fff;padding:10px 14px;font:13px monospace;white-space:pre-wrap';
+    document.body.appendChild(b);
+  }
+  b.textContent += msg + '\n';
+}, true);
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- Panel izquierdo con pestañas: todo cabe sin hacer scroll -->
+<div id="panel">
+  <h1>Simulación de luz 2D</h1>
+  <div class="tabs">
+    <button class="tab on" data-tab="ayuda">Ayuda</button>
+    <button class="tab" data-tab="luz">Luz</button>
+    <button class="tab" data-tab="caja">Caja</button>
+    <button class="tab" data-tab="boton">Botón</button>
+    <button class="tab" data-tab="ajustes">Ajustes</button>
+  </div>
+
+  <div class="pane" data-pane="ayuda">
+    <p class="hint">Mueve al jugador con <b>WASD</b> o las flechas y empuja las cajas. <b>R</b> reinicia. <b>E</b> alterna Jugar/Editar. <b>H</b> oculta este panel.</p>
+    <p class="hint"><b>Luces:</b> azul = te ralentiza · roja = te empuja una casilla (la apaga la caja sobre el botón rojo) · amarilla = te empuja una casilla (la apaga el botón azul que pisas tú).</p>
+    <p class="hint"><b>Meta:</b> toca la puerta verde para pasar al siguiente nivel. Si abres el editor, ese nivel ya no avanza: usa «Empezar partida» en Ajustes.</p>
+    <p class="hint">En <b>Editar</b>, elige una herramienta en la barra de abajo. Luces: <b>1</b> azul · <b>2</b> roja · <b>3</b> amarilla. Botones: <b>4</b> azul · <b>5</b> rojo (al colocarlo, haz clic en la luz que apagará). Puerta de salida: <b>O</b>. Al seleccionar algo, este panel salta solo a su pestaña.</p>
+  </div>
+
+  <div class="pane" data-pane="luz" hidden>
+    <p class="hint" id="luzTipo"></p>
+    <label>Alcance <b id="vR"></b></label>
+    <input type="range" id="radius" min="80" max="1200" value="420">
+    <label>Intensidad <b id="vI"></b></label>
+    <input type="range" id="intensity" min="0.1" max="1.5" step="0.05" value="1">
+  </div>
+
+  <div class="pane" data-pane="caja" hidden>
+    <label>Ancho (px)</label>
+    <input type="number" id="shW" min="12" step="12" disabled>
+    <label>Alto (px)</label>
+    <input type="number" id="shH" min="12" step="12" disabled>
+    <label class="check"><input type="checkbox" id="shMov" disabled> Empujable por el jugador</label>
+    <p class="hint">También puedes arrastrar los cuadritos de la caja para cambiar su tamaño.</p>
+  </div>
+
+  <div class="pane" data-pane="boton" hidden>
+    <p class="hint" id="botonTipo"></p>
+    <label>Luz que controla</label>
+    <select id="botonLink" disabled></select>
+    <div class="row"><button id="botonVincular" disabled>Elegir la luz con un clic</button></div>
+    <p class="hint">Cada luz solo puede tener un botón, y cada botón una luz. Las luces sin botón libre no aparecen en la lista.</p>
+  </div>
+
+  <div class="pane" data-pane="ajustes" hidden>
+    <label>Luz ambiente <b id="vA"></b></label>
+    <input type="range" id="ambient" min="0" max="0.6" step="0.01" value="0.07">
+    <label>Suavidad de sombras <b id="vB"></b></label>
+    <input type="range" id="blur" min="0" max="12" step="1" value="3">
+    <label class="check"><input type="checkbox" id="flicker"> Parpadeo de llama</label>
+    <label class="check"><input type="checkbox" id="showRays" checked> Mostrar raycast</label>
+    <label class="check"><input type="checkbox" id="showAABB"> Mostrar cajas AABB</label>
+    <label class="check"><input type="checkbox" id="showLinks" checked> Mostrar enlaces botón → luz</label>
+    <div class="row"><button id="reset">Empezar partida (nivel 1)</button></div>
+  </div>
+</div>
+
+<div id="hud">
+  <div class="state" id="hState">En sombra</div>
+  <div><span>Luces que lo tocan:</span> <b id="hN">0</b></div>
+  <div><span>Veces tocado:</span> <b id="hC">0</b></div>
+  <div><span>Tiempo en luz:</span> <b id="hT">0.0</b> s</div>
+  <div><span>Efecto:</span> <b id="hE">Ninguno</b></div>
+  <div><span>Nivel:</span> <b id="hNivel">1 / 1</b></div>
+</div>
+
+<!-- Barra inferior siempre visible: aquí está el editor -->
+<div id="toolbar">
+  <div id="tools" hidden>
+    <button data-tool="select" class="on">Mover (V)</button>
+    <button data-tool="box">Caja (B)</button>
+    <button data-tool="crate">Caja móvil (M)</button>
+    <button data-tool="luz_azul">Luz azul (1)</button>
+    <button data-tool="luz_roja">Luz roja (2)</button>
+    <button data-tool="luz_amarilla">Luz amarilla (3)</button>
+    <button data-tool="boton_azul">Botón azul (4)</button>
+    <button data-tool="boton_roja">Botón rojo (5)</button>
+    <button data-tool="puerta">Puerta (O)</button>
+    <button data-tool="player">Jugador (P)</button>
+    <button data-tool="delete">Borrar (X)</button>
+    <label class="check"><input type="checkbox" id="snap" checked> Cuadrícula</label>
+    <span class="sep"></span>
+    <button id="nSave">Guardar</button>
+    <button id="nLoad">Cargar</button>
+    <button id="nExport">Exportar</button>
+    <button id="nImport">Importar</button>
+    <button id="nNew">Vacío</button>
+  </div>
+  <button id="btnModo">✎ Editar (E)</button>
+</div>
+<button id="btnInfo">Ocultar info (H)</button>
+<input type="file" id="file" accept=".json" hidden>
+<div id="toast"></div>
+
+<div id="victoria" hidden>
+  <div class="caja">
+    <h2>¡Victoria!</h2>
+    <p>Completaste los <b id="vNiveles">0</b> niveles.</p>
+    <p>Veces tocado: <b id="vTocado">0</b> · Tiempo en luz: <b id="vTiempo">0.0</b> s</p>
+    <button id="vOtra">Jugar de nuevo</button>
+  </div>
+</div>
+
+<script src="js/nucleo/estado.js"></script>
+<script src="js/nucleo/colisiones.js"></script>
+<script src="js/luz/raycast.js"></script>
+<script src="js/luz/luz.js"></script>
+<script src="js/juego/jugador.js"></script>
+<script src="js/juego/mecanicas.js"></script>
+<script src="js/juego/niveles.js"></script>
+<script src="js/editor/escena.js"></script>
+<script src="js/editor/editor.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
