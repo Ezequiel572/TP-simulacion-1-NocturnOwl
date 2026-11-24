@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulación de luz 2D</title>
+<script src="js/ui/estilos.js"></script>
+<script src="js/ui/menus_estilos.js"></script>
+
+<script>
+addEventListener('error', e => {
+  const t = e.target;
+  const msg = t && t.getAttribute && (t.getAttribute('src') || t.getAttribute('href'))
+    ? 'No se pudo cargar "' + (t.getAttribute('src') || t.getAttribute('href')) + '". Revisa que las carpetas js/, css/ y assets/ estén junto a index.html.'
+    : 'Error de JavaScript: ' + e.message + ' (' + String(e.filename).split('/').pop() + ':' + e.lineno + ')';
+  let b = document.getElementById('err');
+  if (!b) {
+    b = document.createElement('div'); b.id = 'err';
+    b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99;background:#7a1b1b;color:#fff;padding:10px 14px;font:13px monospace;white-space:pre-wrap';
+    document.body.appendChild(b);
+  }
+  b.textContent += msg + '\n';
+}, true);
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<!-- Panel izquierdo con pestañas: todo cabe sin hacer scroll -->
+<div id="panel">
+  <h1>Simulación de luz 2D</h1>
+  <div class="tabs">
+    <button class="tab on" data-tab="ayuda"><i data-icono="ayuda"></i><span>Ayuda</span></button>
+    <button class="tab" data-tab="luz"><i data-icono="luz_amarilla"></i><span>Luz</span></button>
+    <button class="tab" data-tab="caja"><i data-icono="crate"></i><span>Caja</span></button>
+    <button class="tab" data-tab="boton"><i data-icono="boton_roja"></i><span>Botón</span></button>
+    <button class="tab" data-tab="ajustes"><i data-icono="ajustes"></i><span>Ajustes</span></button>
+  </div>
+
+  <!-- AYUDA -->
+  <div class="pane" data-pane="ayuda">
+    <div class="bloque"><h3>Jugar</h3>
+      <div class="item"><i data-icono="player"></i><p>Muévete con <b>WASD</b> o las flechas y empuja las cajas.</p></div>
+      <div class="item"><i data-icono="puerta"></i><p>Toca la <b>puerta verde</b> para pasar al siguiente nivel.</p></div>
+      <div class="item"><p><kbd>R</kbd> reiniciar · <kbd>Enter</kbd> pausa · <kbd>E</kbd> jugar/editar · <kbd>K</kbd> mostrar/ocultar interfaz</p></div>
+    </div>
+    <div class="bloque"><h3>Luces</h3>
+      <div class="item"><i data-icono="luz_azul"></i><p><b>Azul:</b> zona segura. Dentro de ella las otras luces no te hacen nada. Aparece al pisar su botón activador.</p></div>
+      <div class="item"><i data-icono="luz_roja"></i><p><b>Roja:</b> te empuja una casilla. Se apaga mientras una caja esté sobre su botón sostenido.</p></div>
+      <div class="item"><i data-icono="luz_amarilla"></i><p><b>Amarilla:</b> te empuja una casilla. Se apaga al pisar su botón de apagar. Puede moverse.</p></div>
+      <div class="item"><i data-icono="crate"></i><p>Una caja encima de una luz la tapa.</p></div>
+    </div>
+    <div class="bloque"><h3>Editor</h3>
+      <div class="item"><i data-icono="select"></i><p>Pulsa <b>E</b>, elige una herramienta en la barra de abajo y haz clic en el mapa.</p></div>
+      <div class="item"><i data-icono="enlace"></i><p>Al colocar un botón, haz clic en la luz que controla (botón nº N y luz nº N van juntos).</p></div>
+      <div class="item"><i data-icono="ajustes"></i><p>Al seleccionar algo con <b>Mover</b>, este panel te muestra sus opciones.</p></div>
+    </div>
+  </div>
+
+  <!-- LUZ -->
+  <div class="pane" data-pane="luz" hidden>
+    <div id="luzVacio" class="vacio"><i data-icono="select"></i><p>Selecciona una luz con <b>Mover</b> o crea una con la barra de abajo (<kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd>).</p></div>
+    <div id="luzCtl" hidden>
+      <div class="cabecera"><span class="ficha" id="luzIcono"></span><div><h2 id="luzTitulo"></h2><p id="luzTipo"></p></div></div>
+      <div class="ctl"><div class="ctl-top"><i data-icono="numero"></i><span>Número de luz</span></div>
+      <div class="stepper"><button type="button" data-for="luzNum" data-paso="-1" title="Menos">−</button><input type="number" id="luzNum" min="1" step="1"><button type="button" data-for="luzNum" data-paso="1" title="Más">+</button></div>
+      <small>Lo comparte con su botón.</small></div>
+      <div class="ctl"><div class="ctl-top"><i data-icono="alcance"></i><span>Alcance</span><b id="vR"></b></div>
+      <input type="range" id="radius" min="80" max="1200" value="420"></div>
+      <div class="ctl"><div class="ctl-top"><i data-icono="brillo"></i><span>Intensidad</span><b id="vI"></b></div>
+      <input type="range" id="intensity" min="0.1" max="1.5" step="0.05" value="1"></div>
+      <div id="rutaBox" class="tarjeta" hidden>
+        <label class="switch"><input type="checkbox" id="rutaOn"><span class="pista"></span><span class="txt"><i data-icono="ruta"></i>Se mueve de A a B</span></label>
+        <div id="rutaOpc" hidden>
+          <div class="ctl"><div class="ctl-top"><i data-icono="velocidad"></i><span>Velocidad</span><b id="vV"></b></div>
+      <input type="range" id="rutaVel" min="20" max="400" step="10" value="120"></div>
+          <label class="switch"><input type="checkbox" id="rutaVaiven" checked><span class="pista"></span><span class="txt"><i data-icono="vaiven"></i>Ir y volver</span></label>
+          <button type="button" id="rutaElegir" class="btn-icono"><i data-icono="select"></i>Elegir punto B con un clic</button>
+          <small>A es donde está la luz. También puedes arrastrar el rombo B. Si lo borras, se quita la ruta.</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAJA -->
+  <div class="pane" data-pane="caja" hidden>
+    <div id="cajaVacio" class="vacio"><i data-icono="select"></i><p>Selecciona una pared o caja con <b>Mover</b>, o crea una con <kbd>B</kbd> o <kbd>M</kbd>.</p></div>
+    <div id="cajaCtl" hidden>
+      <div class="cabecera"><span class="ficha" id="cajaIcono"></span><div><h2 id="cajaTitulo"></h2><p id="cajaDesc"></p></div></div>
+      <div class="ctl"><div class="ctl-top"><i data-icono="ancho"></i><span>Ancho (px)</span></div>
+      <div class="stepper"><button type="button" data-for="shW" data-paso="-1" title="Menos">−</button><input type="number" id="shW" min="12" step="12"><button type="button" data-for="shW" data-paso="1" title="Más">+</button></div></div>
+      <div class="ctl"><div class="ctl-top"><i data-icono="alto"></i><span>Alto (px)</span></div>
+      <div class="stepper"><button type="button" data-for="shH" data-paso="-1" title="Menos">−</button><input type="number" id="shH" min="12" step="12"><button type="button" data-for="shH" data-paso="1" title="Más">+</button></div></div>
+      <label class="switch"><input type="checkbox" id="shMov"><span class="pista"></span><span class="txt"><i data-icono="crate"></i>Empujable por el jugador</span></label>
+      <small class="nota">También puedes arrastrar los cuadritos de la caja para cambiar su tamaño.</small>
+    </div>
+  </div>
+
+  <!-- BOTÓN -->
+  <div class="pane" data-pane="boton" hidden>
+    <div id="botonVacio" class="vacio"><i data-icono="select"></i><p>Selecciona un botón con <b>Mover</b>, o crea uno con <kbd>4</kbd> <kbd>5</kbd> <kbd>6</kbd>.</p></div>
+    <div id="botonCtl" hidden>
+      <div class="cabecera"><span class="ficha" id="botonIcono"></span><div><h2 id="botonTitulo"></h2><p id="botonTipo"></p></div></div>
+      <div class="ctl"><div class="ctl-top"><i data-icono="enlace"></i><span>Luz que controla</span></div>
+        <div id="botonChips" class="chips"></div>
+        <select id="botonLink" hidden></select></div>
+      <button type="button" id="botonVincular" class="btn-icono"><i data-icono="select"></i>Elegir la luz con un clic en el mapa</button>
+      <small class="nota">Cada luz solo puede tener un botón, y cada botón una luz. Las luces que ya tienen botón no aparecen.</small>
+    </div>
+  </div>
+
+  <!-- AJUSTES -->
+  <div class="pane" data-pane="ajustes" hidden>
+    <div class="ctl"><div class="ctl-top"><i data-icono="luna"></i><span>Luz ambiente</span><b id="vA"></b></div>
+      <input type="range" id="ambient" min="0" max="0.6" step="0.01" value="0.07"></div>
+    <div class="ctl"><div class="ctl-top"><i data-icono="gota"></i><span>Suavidad de sombras</span><b id="vB"></b></div>
+      <input type="range" id="blur" min="0" max="12" step="1" value="3"></div>
+    <div class="bloque"><h3>Ver</h3>
+    <label class="switch"><input type="checkbox" id="flicker"><span class="pista"></span><span class="txt"><i data-icono="llama"></i>Parpadeo de llama</span></label>
+    <label class="switch"><input type="checkbox" id="showRays"><span class="pista"></span><span class="txt"><i data-icono="rayo"></i>Mostrar raycast</span></label>
+    <label class="switch"><input type="checkbox" id="showAABB"><span class="pista"></span><span class="txt"><i data-icono="aabb"></i>Mostrar cajas AABB</span></label>
+    <label class="switch"><input type="checkbox" id="showLinks"><span class="pista"></span><span class="txt"><i data-icono="enlace"></i>Mostrar enlaces botón → luz</span></label>
+    </div>
+    <button type="button" id="reset" class="btn-icono"><i data-icono="reiniciar"></i>Empezar partida (nivel 1)</button>
+  </div>
+</div>
+
+<div id="hud">
+  <div class="state" id="hState">En sombra</div>
+  <div><span>Luces que lo tocan:</span> <b id="hN">0</b></div>
+  <div><span>Veces tocado:</span> <b id="hC">0</b></div>
+  <div><span>Tiempo en luz:</span> <b id="hT">0.0</b> s</div>
+  <div><span>Efecto:</span> <b id="hE">Ninguno</b></div>
+  <div><span>Nivel:</span> <b id="hNivel">1 / 1</b></div>
+</div>
+
+<!-- Barra inferior siempre visible: aquí está el editor -->
+<div id="toolbar">
+  <div id="tools" hidden>
+    <div class="grupo"><span class="cap">Edición</span><div class="fila">
+      <button data-tool="select" class="tool on" title="Mover (V): selecciona y arrastra cualquier cosa"><kbd>V</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M9 4v21l5.5-5 4 8 3.5-1.8-4-7.7H23z" fill="#e6e8ee" stroke="#0b0d12" stroke-width="1.5" stroke-linejoin="round"/></svg><span>Mover</span></button>
+      <button data-tool="delete" class="tool" title="Borrar (X): haz clic en lo que quieras quitar"><kbd>X</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 9h16l-1.5 18h-13z" fill="#e5484d" stroke="#0b0d12" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 9h20M13 9V6h6v3" stroke="#0b0d12" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 13v10M16 13v10M19 13v10" stroke="#fff" stroke-width="1.4" opacity=".8"/></svg><span>Borrar</span></button>
+      <label class="check"><input type="checkbox" id="snap" checked> Cuadrícula</label>
+    </div></div>
+    <div class="grupo"><span class="cap">Terreno</span><div class="fila">
+      <button data-tool="box" class="tool" title="Pared (B): bloque fijo que proyecta sombra"><kbd>B</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="6" width="26" height="20" rx="2" fill="#7a3324" stroke="#0b0d12" stroke-width="1.5"/><path d="M3 12.7h26M3 19.3h26M12 6v6.7M22 12.7v6.6M12 19.3V26" stroke="#0b0d12" stroke-width="1.5" fill="none"/></svg><span>Pared</span></button>
+      <button data-tool="crate" class="tool" title="Caja móvil (M): el jugador puede empujarla y tapa la luz"><kbd>M</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="4" width="24" height="24" rx="2" fill="#a8672f" stroke="#0b0d12" stroke-width="1.5"/><path d="M4 4l24 24M28 4L4 28" stroke="#6e3f17" stroke-width="2"/><rect x="5.5" y="5.5" width="21" height="21" rx="1" fill="none" stroke="#6e3f17" stroke-width="2.5"/></svg><span>Caja móvil</span></button>
+    </div></div>
+    <div class="grupo"><span class="cap">Luces</span><div class="fila">
+      <button data-tool="luz_azul" class="tool" title="Luz azul (1): zona segura"><kbd>1</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><g stroke="#3d8bff" stroke-width="2" stroke-linecap="round"><path d="M16 3v4M16 25v4M3 16h4M25 16h4M7 7l3 3M22 22l3 3M25 7l-3 3M10 22l-3 3"/></g><circle cx="16" cy="16" r="6" fill="#3d8bff" stroke="#0b0d12" stroke-width="1.5"/></svg><span>Luz azul</span></button>
+      <button data-tool="luz_roja" class="tool" title="Luz roja (2): te empuja"><kbd>2</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><g stroke="#ff2b2b" stroke-width="2" stroke-linecap="round"><path d="M16 3v4M16 25v4M3 16h4M25 16h4M7 7l3 3M22 22l3 3M25 7l-3 3M10 22l-3 3"/></g><circle cx="16" cy="16" r="6" fill="#ff2b2b" stroke="#0b0d12" stroke-width="1.5"/></svg><span>Luz roja</span></button>
+      <button data-tool="luz_amarilla" class="tool" title="Luz amarilla (3): te empuja; puede moverse de A a B"><kbd>3</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><g stroke="#ffd028" stroke-width="2" stroke-linecap="round"><path d="M16 3v4M16 25v4M3 16h4M25 16h4M7 7l3 3M22 22l3 3M25 7l-3 3M10 22l-3 3"/></g><circle cx="16" cy="16" r="6" fill="#ffd028" stroke="#0b0d12" stroke-width="1.5"/></svg><span>Luz amarilla</span></button>
+    </div></div>
+    <div class="grupo"><span class="cap">Botones</span><div class="fila">
+      <button data-tool="boton_azul" class="tool" title="Botón activador (4): lo pisas una vez y aparece la luz azul"><kbd>4</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="4" width="24" height="24" rx="3" fill="#1a1d26" stroke="#2f7bff" stroke-width="2"/><circle cx="16" cy="16" r="6.5" fill="#2f7bff"/></svg><span>Activador</span></button>
+      <button data-tool="boton_roja" class="tool" title="Botón sostenido (5): hay que mantenerlo con una caja"><kbd>5</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="4" width="24" height="24" rx="3" fill="#1a1d26" stroke="#e5262a" stroke-width="2"/><rect x="10" y="10" width="12" height="12" rx="2" fill="#e5262a"/></svg><span>Sostenido</span></button>
+      <button data-tool="boton_amarilla" class="tool" title="Botón de apagar (6): lo pisas una vez y apaga la luz amarilla"><kbd>6</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="4" width="24" height="24" rx="3" fill="#1a1d26" stroke="#ffd028" stroke-width="2"/><rect x="9" y="9" width="14" height="14" rx="2" fill="#ffd028"/><path d="M16 11.5v5" stroke="#1a1306" stroke-width="2" stroke-linecap="round"/><path d="M12.8 13.6a4.6 4.6 0 1 0 6.4 0" fill="none" stroke="#1a1306" stroke-width="2" stroke-linecap="round"/></svg><span>Apagar</span></button>
+    </div></div>
+    <div class="grupo"><span class="cap">Nivel</span><div class="fila">
+      <button data-tool="puerta" class="tool" title="Puerta de salida (O)"><kbd>O</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="7" y="3" width="18" height="26" rx="2" fill="#2a1d12" stroke="#7dffb0" stroke-width="2"/><rect x="10" y="7" width="12" height="22" fill="#1f9d6b"/><circle cx="20" cy="19" r="1.8" fill="#ffd028"/></svg><span>Puerta</span></button>
+      <button data-tool="player" class="tool" title="Punto de inicio del jugador (P)"><kbd>P</kbd><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="6" width="20" height="20" rx="3" fill="#2fbf9a" stroke="#0b0d12" stroke-width="2"/><circle cx="12.5" cy="14" r="2" fill="#0b0d12"/><circle cx="19.5" cy="14" r="2" fill="#0b0d12"/><path d="M12 20q4 3 8 0" stroke="#0b0d12" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg><span>Jugador</span></button>
+    </div></div>
+    <div class="grupo"><span class="cap">Archivo</span><div class="fila">
+      <button id="nSave" class="tool accion" title="Guardar en el navegador"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 5h18l4 4v18H5z" fill="#4a90e2" stroke="#0b0d12" stroke-width="1.5" stroke-linejoin="round"/><rect x="10" y="5" width="10" height="7" fill="#e6e8ee"/><rect x="10" y="18" width="12" height="9" rx="1" fill="#e6e8ee"/></svg><span>Guardar</span></button>
+      <button id="nLoad" class="tool accion" title="Cargar lo guardado en el navegador"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 9h9l3 3h14v15H3z" fill="#e0a43a" stroke="#0b0d12" stroke-width="1.5" stroke-linejoin="round"/></svg><span>Cargar</span></button>
+      <button id="nExport" class="tool accion" title="Descargar el nivel como .json"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 21V5M9 11l7-7 7 7M5 20v7h22v-7" fill="none" stroke="#e6e8ee" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Exportar</span></button>
+      <button id="nImport" class="tool accion" title="Abrir un nivel .json"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4v16M9 14l7 7 7-7M5 20v7h22v-7" fill="none" stroke="#e6e8ee" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Importar</span></button>
+      <button id="nNew" class="tool accion" title="Empezar un nivel vacío"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 4h11l6 6v18H8z" fill="#e6e8ee" stroke="#0b0d12" stroke-width="1.5" stroke-linejoin="round"/><path d="M19 4v6h6" fill="#b9c0cf" stroke="#0b0d12" stroke-width="1.5" stroke-linejoin="round"/></svg><span>Vacío</span></button>
+    </div></div>
+  </div>
+  <button id="btnMenu">☰ Menú</button>
+  <button id="btnModo">✎ Editar (E)</button>
+</div>
+<button id="btnInfo">Mostrar info (K)</button>
+<input type="file" id="file" accept=".json" hidden>
+<div id="toast"></div>
+<pre id="perf" hidden></pre>
+
+<div id="victoria" hidden>
+  <div class="caja">
+    <h2>¡Victoria!</h2>
+    <p>Completaste los <b id="vNiveles">0</b> niveles.</p>
+    <p>Veces tocado: <b id="vTocado">0</b> · Tiempo en luz: <b id="vTiempo">0.0</b> s</p>
+    <button id="vOtra">Jugar de nuevo</button>
+    <button id="vMenu">Volver al menú</button>
+  </div>
+</div>
+
+<!-- Menú de Pausa: se abre y se cierra solo con Enter durante la partida -->
+<div id="pausa" hidden>
+  <h2>PAUSA</h2>
+  <p>Presiona <kbd>Enter</kbd> para continuar</p>
+  <div class="menu-botones">
+    <button id="pReiniciar">Reiniciar nivel</button>
+    <button id="pMenu">Menú inicial</button>
+  </div>
+</div>
+
+<!-- Menú de Inicio: título, «Jugar» (selector de niveles) y «Editor de niveles» -->
+<div id="menu" hidden>
+  <div id="menuPrincipal" class="menu-pantalla">
+    <h1 class="menu-titulo">Simulación de luz 2D</h1>
+    <div class="menu-botones">
+      <button id="mJugar">Jugar</button>
+      <button id="mEditor">Editor de niveles</button>
+    </div>
+  </div>
+  <div id="menuNiveles" class="menu-pantalla" hidden>
+    <h1 class="menu-titulo menu-sub">Elegir nivel</h1>
+    <div id="listaNiveles" class="menu-niveles"></div>
+    <div class="menu-botones"><button id="mVolver">Volver</button></div>
+  </div>
+</div>
+
+<!-- ORDEN DE CARGA (importa: cada archivo usa lo que declaran los anteriores)
+     nucleo → luz → juego → iconos → editor → menus → Pixi (CDN) → render → main (el último arranca todo) -->
+<script src="js/nucleo/estado.js"></script>
+<script src="js/nucleo/colisiones.js"></script>
+<script src="js/luz/raycast.js"></script>
+<script src="js/luz/luz.js"></script>
+<script src="js/juego/jugador.js"></script>
+<script src="js/juego/mecanicas.js"></script>
+<script src="js/juego/niveles.js"></script>
+<script src="js/ui/iconos.js"></script>
+<script src="js/editor/escena.js"></script>
+<script src="js/editor/editor.js"></script>
+<script src="js/ui/menus.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pixi.js@8.13.0/dist/pixi.min.js"></script>
+<script src="js/render/imagenes.js"></script>
+<script src="js/render/pixijs.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
